@@ -177,19 +177,33 @@ class isys_handler_isc_dhcpd extends isys_handler
         $l_ipv6_assignment    = $l_res->get_row();
         $l_ipv6_assignment_id = $l_ipv6_assignment['isys_ipv6_assignment__id'];
 
-        $l_sql = "SELECT hostname.isys_catg_ip_list__hostname AS hostname, ip.isys_cats_net_ip_addresses_list__title AS ip, isys_catg_port_list__mac AS mac,GROUP_CONCAT(dns_server_ip.isys_cats_net_ip_addresses_list__title) AS dns_server_ip FROM isys_catg_port_list " . "INNER JOIN isys_catg_ip_list AS hostname ON isys_catg_ip_list__isys_catg_port_list__id = isys_catg_port_list__id " . "INNER JOIN isys_cats_net_ip_addresses_list AS ip ON isys_cats_net_ip_addresses_list__id = isys_catg_ip_list__isys_cats_net_ip_addresses_list__id " . " INNER JOIN isys_catg_ip_list_2_isys_catg_ip_list as ip_to_dns_server_ip ON hostname.isys_catg_ip_list__id = ip_to_dns_server_ip.isys_catg_ip_list__id " . " INNER JOIN isys_catg_ip_list as dns_server_hostaddresse ON ip_to_dns_server_ip.isys_catg_ip_list__id__dns = dns_server_hostaddresse.isys_catg_ip_list__id ". " INNER JOIN isys_cats_net_ip_addresses_list as dns_server_ip ON dns_server_hostaddresse.isys_catg_ip_list__isys_cats_net_ip_addresses_list__id = dns_server_ip.isys_cats_net_ip_addresses_list__id " . "WHERE " . "(hostname.isys_catg_ip_list__isys_ip_assignment__id = " . $this->m_dao->convert_sql_id(
-                $l_ipv4_assignment_id
-            ) . " OR hostname.isys_catg_ip_list__isys_ipv6_assignment__id = " . $this->m_dao->convert_sql_id(
-                $l_ipv6_assignment_id
-            ) . ") " . "AND ip.isys_cats_net_ip_addresses_list__title IS NOT NULL AND hostname.isys_catg_ip_list__hostname != '' ";
-        //"AND isys_catg_ip_list__primary = 1 ".
+        $l_sql = "SELECT ";
+        $l_sql .= "hostname.isys_catg_ip_list__hostname AS hostname, ";
+        $l_sql .= "ip.isys_cats_net_ip_addresses_list__title AS ip, ";
+        $l_sql .= "isys_catg_port_list__mac AS mac, ";
+        $l_sql .= "GROUP_CONCAT(dns_server_ip.isys_cats_net_ip_addresses_list__title) AS dns_server_ip, ";
+        $l_sql .= "GROUP_CONCAT(DISTINCT dns_domain.isys_net_dns_domain__title SEPARATOR ' ') AS dns_domain ";
+        $l_sql .= "FROM isys_catg_port_list ";
+        $l_sql .= "INNER JOIN isys_catg_ip_list AS hostname ON isys_catg_ip_list__isys_catg_port_list__id = isys_catg_port_list__id AND hostname.isys_catg_ip_list__status = 2 ";
+        $l_sql .= "INNER JOIN isys_cats_net_ip_addresses_list AS ip ON isys_cats_net_ip_addresses_list__id = isys_catg_ip_list__isys_cats_net_ip_addresses_list__id AND ip.isys_cats_net_ip_addresses_list__status = 2 ";
+        $l_sql .= "INNER JOIN isys_catg_ip_list_2_isys_catg_ip_list as ip_to_dns_server_ip ON hostname.isys_catg_ip_list__id = ip_to_dns_server_ip.isys_catg_ip_list__id ";
+        $l_sql .= "INNER JOIN isys_catg_ip_list as dns_server_hostaddresse ON ip_to_dns_server_ip.isys_catg_ip_list__id__dns = dns_server_hostaddresse.isys_catg_ip_list__id AND dns_server_hostaddresse.isys_catg_ip_list__status = 2 ";
+        $l_sql .= "INNER JOIN isys_cats_net_ip_addresses_list as dns_server_ip ON dns_server_hostaddresse.isys_catg_ip_list__isys_cats_net_ip_addresses_list__id = dns_server_ip.isys_cats_net_ip_addresses_list__id AND dns_server_ip.isys_cats_net_ip_addresses_list__status = 2 ";
+        $l_sql .= "INNER JOIN isys_catg_ip_list_2_isys_net_dns_domain AS ip_to_dns_domain ON hostname.isys_catg_ip_list__id = ip_to_dns_domain.isys_catg_ip_list__id ";
+        $l_sql .= "INNER JOIN isys_catg_ip_list_2_isys_net_dns_domain AS ip_to_dns_domain ON hostname.isys_catg_ip_list__id = ip_to_dns_domain.isys_catg_ip_list__id ";
+        $l_sql .= "WHERE (hostname.isys_catg_ip_list__isys_ip_assignment__id = " . $this->m_dao->convert_sql_id($l_ipv4_assignment_id) . " ";
+            $l_sql .= "OR hostname.isys_catg_ip_list__isys_ipv6_assignment__id = " . $this->m_dao->convert_sql_id($l_ipv6_assignment_id) . ") ";
+        $l_sql .= "AND ip.isys_cats_net_ip_addresses_list__title IS NOT NULL ";
+        $l_sql .= "AND hostname.isys_catg_ip_list__hostname != '' ";
+        $l_sql .= "AND isys_catg_port_list.isys_catg_port_list__status = 2 ";
+    
 
         if (!is_null($p_net_obj_id))
         {
-            $l_sql .= "AND ip.isys_cats_net_ip_addresses_list__isys_obj__id = " . $this->m_dao->convert_sql_id($p_net_obj_id);
+            $l_sql .= "AND ip.isys_cats_net_ip_addresses_list__isys_obj__id = " . $this->m_dao->convert_sql_id($p_net_obj_id) . " ";
         } // if
 
-        $l_sql .= ' GROUP BY hostname.isys_catg_ip_list__hostname ORDER BY hostname;';
+        $l_sql .= 'GROUP BY hostname.isys_catg_ip_list__hostname ORDER BY hostname;';
 
         echo $l_sql;
         $l_res    = $this->m_dao->retrieve($l_sql);
@@ -211,6 +225,7 @@ class isys_handler_isc_dhcpd extends isys_handler
 
             $l_output .= "\toption host-name " . $l_row['hostname'] . ";\n";
             $l_output .= "\toption domain-name-servers " . $l_row['dns_server_ip'] . ";\n";
+            $l_output .= "\toption domain-name \"" . $l_row['dns_domain'] . "\";\n";
             $l_output .= "}\n";
         }
 
