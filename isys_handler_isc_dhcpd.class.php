@@ -181,16 +181,16 @@ class isys_handler_isc_dhcpd extends isys_handler
         $l_sql .= "hostname.isys_catg_ip_list__hostname AS hostname, ";
         $l_sql .= "ip.isys_cats_net_ip_addresses_list__title AS ip, ";
         $l_sql .= "isys_catg_port_list__mac AS mac, ";
-        $l_sql .= "GROUP_CONCAT(dns_server_ip.isys_cats_net_ip_addresses_list__title) AS dns_server_ip, ";
+        $l_sql .= "GROUP_CONCAT(DISTINCT dns_server_ip.isys_cats_net_ip_addresses_list__title) AS dns_server_ip, ";
         $l_sql .= "GROUP_CONCAT(DISTINCT dns_domain.isys_net_dns_domain__title SEPARATOR ' ') AS dns_domain ";
         $l_sql .= "FROM isys_catg_port_list ";
         $l_sql .= "INNER JOIN isys_catg_ip_list AS hostname ON isys_catg_ip_list__isys_catg_port_list__id = isys_catg_port_list__id AND hostname.isys_catg_ip_list__status = 2 ";
         $l_sql .= "INNER JOIN isys_cats_net_ip_addresses_list AS ip ON isys_cats_net_ip_addresses_list__id = isys_catg_ip_list__isys_cats_net_ip_addresses_list__id AND ip.isys_cats_net_ip_addresses_list__status = 2 ";
-        $l_sql .= "INNER JOIN isys_catg_ip_list_2_isys_catg_ip_list as ip_to_dns_server_ip ON hostname.isys_catg_ip_list__id = ip_to_dns_server_ip.isys_catg_ip_list__id ";
-        $l_sql .= "INNER JOIN isys_catg_ip_list as dns_server_hostaddresse ON ip_to_dns_server_ip.isys_catg_ip_list__id__dns = dns_server_hostaddresse.isys_catg_ip_list__id AND dns_server_hostaddresse.isys_catg_ip_list__status = 2 ";
-        $l_sql .= "INNER JOIN isys_cats_net_ip_addresses_list as dns_server_ip ON dns_server_hostaddresse.isys_catg_ip_list__isys_cats_net_ip_addresses_list__id = dns_server_ip.isys_cats_net_ip_addresses_list__id AND dns_server_ip.isys_cats_net_ip_addresses_list__status = 2 ";
-        $l_sql .= "INNER JOIN isys_catg_ip_list_2_isys_net_dns_domain AS ip_to_dns_domain ON hostname.isys_catg_ip_list__id = ip_to_dns_domain.isys_catg_ip_list__id ";
-        $l_sql .= "INNER JOIN isys_net_dns_domain AS dns_domain ON ip_to_dns_domain.isys_net_dns_domain__id = dns_domain.isys_net_dns_domain__id AND dns_domain.isys_net_dns_domain__status = 2 ";
+        $l_sql .= "LEFT JOIN isys_catg_ip_list_2_isys_catg_ip_list as ip_to_dns_server_ip ON hostname.isys_catg_ip_list__id = ip_to_dns_server_ip.isys_catg_ip_list__id ";
+        $l_sql .= "LEFT JOIN isys_catg_ip_list as dns_server_hostaddresse ON ip_to_dns_server_ip.isys_catg_ip_list__id__dns = dns_server_hostaddresse.isys_catg_ip_list__id AND dns_server_hostaddresse.isys_catg_ip_list__status = 2 ";
+        $l_sql .= "LEFT JOIN isys_cats_net_ip_addresses_list as dns_server_ip ON dns_server_hostaddresse.isys_catg_ip_list__isys_cats_net_ip_addresses_list__id = dns_server_ip.isys_cats_net_ip_addresses_list__id AND dns_server_ip.isys_cats_net_ip_addresses_list__status = 2 ";
+        $l_sql .= "LEFT JOIN isys_catg_ip_list_2_isys_net_dns_domain AS ip_to_dns_domain ON hostname.isys_catg_ip_list__id = ip_to_dns_domain.isys_catg_ip_list__id ";
+        $l_sql .= "LEFT JOIN isys_net_dns_domain AS dns_domain ON ip_to_dns_domain.isys_net_dns_domain__id = dns_domain.isys_net_dns_domain__id AND dns_domain.isys_net_dns_domain__status = 2 ";
         $l_sql .= "WHERE (hostname.isys_catg_ip_list__isys_ip_assignment__id = " . $this->m_dao->convert_sql_id($l_ipv4_assignment_id) . " ";
             $l_sql .= "OR hostname.isys_catg_ip_list__isys_ipv6_assignment__id = " . $this->m_dao->convert_sql_id($l_ipv6_assignment_id) . ") ";
         $l_sql .= "AND ip.isys_cats_net_ip_addresses_list__title IS NOT NULL ";
@@ -223,8 +223,12 @@ class isys_handler_isc_dhcpd extends isys_handler
             } // if
 
             $l_output .= "\toption host-name " . $l_row['hostname'] . ";\n";
-            $l_output .= "\toption domain-name-servers " . $l_row['dns_server_ip'] . ";\n";
-            $l_output .= "\toption domain-name \"" . $l_row['dns_domain'] . "\";\n";
+            if (isset($l_row['dns_server_ip'])){
+                $l_output .= "\toption domain-name-servers " . $l_row['dns_server_ip'] . ";\n";
+            }
+            if (isset($l_row['dns_domain'])){
+                $l_output .= "\toption domain-name \"" . $l_row['dns_domain'] . "\";\n";
+            }
             $l_output .= "}\n";
         }
 
